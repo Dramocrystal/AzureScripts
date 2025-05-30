@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Meet the Cats</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f9f9f9;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+
+    h1 {
+      color: #333;
+    }
+
+    .gallery {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      flex-wrap: wrap;
+      margin-top: 30px;
+    }
+
+    .cat-card {
+      background: #fff;
+      padding: 15px;
+      border-radius: 12px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      width: 250px;
+    }
+
+    .cat-card img {
+      width: 100%;
+      border-radius: 8px;
+    }
+
+    button {
+      margin-top: 10px;
+      padding: 10px 20px;
+      font-size: 14px;
+      border: none;
+      border-radius: 6px;
+      background-color: #4CAF50;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #45a049;
+    }
+
+    .cat-name {
+      margin-top: 10px;
+      font-weight: bold;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Meet Our Cats!</h1>
+
+  <div class="gallery">
+    <div class="cat-card">
+      <img src="cat1.png" alt="Cat 1">
+      <button onclick="showName(this, 'Whiskers')">Say Hi</button>
+      <div class="cat-name"></div>
+    </div>
+
+    <div class="cat-card">
+      <img src="cat2.png" alt="Cat 2">
+      <button onclick="showName(this, 'Mochi')">Say Hi</button>
+      <div class="cat-name"></div>
+    </div>
+
+    <div class="cat-card">
+      <img src="cat3.png" alt="Cat 3">
+      <button onclick="showName(this, 'Luna')">Say Hi</button>
+      <div class="cat-name"></div>
+    </div>
+  </div>
+
+  <script>
+    function showName(button, name) {
+      const nameDiv = button.nextElementSibling;
+      nameDiv.textContent = `Hi, my name is ${name}!`;
+      nameDiv.style.display = 'block';
+    }
+  </script>
+</body>
+</html>
