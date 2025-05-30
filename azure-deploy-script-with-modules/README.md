@@ -36,7 +36,7 @@ azure-deploy-script-v2/
 
 1. Clone this repo:
    ```bash
-   git clone https://github.com/yourusername/azure-deploy-script-v2.git
+   git clone https://github.com/Dramocrystal/AzureScripts.git
    cd azure-deploy-script-v2
    ```
 
@@ -49,8 +49,8 @@ azure-deploy-script-v2/
    ```
 
 3. Run the script:
-   ```powershell
-   ./deploy.ps1
+   ```bash
+   powershell ./deploy.ps1
    ```
 
 4. Your site will be available at:
