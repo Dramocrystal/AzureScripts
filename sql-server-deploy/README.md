@@ -44,22 +44,40 @@ powershell ./deploy-db.ps1
 ```
 ---
 
-## 🧪 Previewing the Data in SQL Server Management Studio (SSMS)
 
-Once the import completes:
+## 🧪 How to Preview the Data in SQL Server Management Studio (SSMS)
 
-1. Open **SSMS**.
-2. Use the connection details printed at the end of the script:
-   - **Server name**: `your-sql-server.database.windows.net`
-   - **Login**: SQL admin username
-   - **Password**: As defined in `.env`
-3. Select the imported database (`WideWorldDW`) from the sidebar.
-4. Expand **Tables** to browse the data.
+### Step 1 — Launch the script  
+Run the deployment script from your terminal:  
+```bash
+powershell ./deploy-db.ps1
+```
+The script will output the **SQL Server endpoint** and **admin username** to use in SSMS.  
+![Step 1](images/step1.png)
 
-📸 You can include screenshots of the following:
-- SSMS login screen
-- Table explorer showing the imported tables
-- Query result window (optional)
+---
+
+### Step 2 — Monitor import progress  
+Go to [Azure Portal](https://portal.azure.com) → **Resource Groups** → your group → **SQL Server** → **Data management** → **Import/Export History** to track the import percentage.  
+![Step 2](images/step2.png)
+
+---
+
+### Step 3 — Connect via SSMS  
+Open **SQL Server Management Studio (SSMS)** and log in using the server endpoint and admin credentials printed by the script.  
+![Step 3](images/step3.png)
+
+---
+
+### Step 4 — Browse the data  
+Expand `Databases` → `WideWorldDW` → `Tables` → right-click any table → **Select Top 1000 Rows**.  
+![Step 4](images/step4.png)
+
+---
+
+### Step 5 — View your table  
+The data from the `.bacpac` file will be visible.  
+![Step 5](images/step5.png)
 
 ---
 ## 💥 Common Issues Encountered and Fixes
