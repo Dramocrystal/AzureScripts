@@ -1,5 +1,6 @@
 
 # Azure SQL Deployment Script
+![Architecture](images/architecture.png)
 
 This PowerShell script automates the deployment of a sample SQL database to Azure. It performs the following steps:
 
@@ -32,6 +33,7 @@ Before running the script, make sure:
 - You’ve created a `.env` file in the root directory with your SQL Admin password:
   ```env
   DB_PASSWORD=YourDatabasePasswordHere
+  VM_PASSWORD=YourVMPasswordHere
   ```
 
 ---
@@ -43,7 +45,6 @@ To run the deployment script from your terminal, use the following command:
 powershell ./deploy-db.ps1
 ```
 ---
-
 
 ## 🧪 How to Preview the Data in SQL Server Management Studio (SSMS)
 
@@ -102,3 +103,6 @@ The data from the `.bacpac` file will be visible.
 ## 🔐 Security
 
 Your database password is read from the `.env` file. For production use, consider storing secrets securely using [Azure Key Vault](https://learn.microsoft.com/en-us/azure/key-vault/general/overview).
+
+---
+

@@ -1,6 +1,14 @@
 Import-Module ./DeployModule.psm1
 
 # === Variables ===
+# Read passwords from .env
+$envVars = Get-Content ".env"
+$env:DB_PASSWORD = ($envVars | Where-Object { $_ -match '^DB_PASSWORD=' }) -replace 'DB_PASSWORD=', ''
+$env:VM_PASSWORD = ($envVars | Where-Object { $_ -match '^VM_PASSWORD=' }) -replace 'VM_PASSWORD=', ''
+
+
+
+
 $tenantId = "b94e2438-32a6-4e27-82f4-7b301370a6d8"
 $resourceGroup = "rg-yazid-stage"
 $location = "canadacentral"
@@ -15,22 +23,41 @@ $blobUrl = "https://$storageAccountName.blob.core.windows.net/$containerName/$bl
 $serverName = "yazid-sql"
 $databaseName = "WideWorldDW"
 $sqlAdminUser = "sqladminuser"
-$env:DB_PASSWORD = (Get-Content ".env" | Where-Object { $_ -match '^DB_PASSWORD=' }) -replace 'DB_PASSWORD=', ''
 $sqlAdminPassword = ConvertTo-SecureString $env:DB_PASSWORD -AsPlainText -Force
+
+$vmName = "yazid-vm-web"
+$adminUsername = "azureuser"
+$adminPassword = ConvertTo-SecureString $env:VM_PASSWORD -AsPlainText -Force
+$vmSize = "Standard_B2s"
+$image = "Win2019Datacenter"
 
 
 # === Execution ===
 Ensure-AzModules
 Connect-ToAzure $tenantId
 Ensure-ResourceGroup $resourceGroup $location
+
+# === Create Storage + Upload BACPAC ===
 $ctx = Ensure-StorageAccount $resourceGroup $storageAccountName $location
 Ensure-StorageContainer $ctx $containerName
 Download-File $bacpacUrl $filePath
 Upload-FileToBlob $filePath $ctx $containerName $blobName
-Write-Host "Blob accessible at : $blobUrl"
+Write-Host "Blob accessible at: $blobUrl"
 
+# === Deploy VM First ===
+$vmIp = Deploy-VM $resourceGroup $location $vmName $adminUsername $adminPassword $vmSize $image
+Write-Host "`n VM deployed with public IP: $vmIp"
+
+# === Create SQL Server ===
 Create-SqlServer $resourceGroup $location $serverName $sqlAdminUser $sqlAdminPassword
-Configure-SqlFirewall $resourceGroup $serverName
+
+# === Configure Firewall Rules ===
+$myIp = Get-PublicIp
+Configure-SqlFirewall $resourceGroup $serverName "AllowAzureServices" "0.0.0.0"
+Configure-SqlFirewall $resourceGroup $serverName "MyPublicIP" $myIp
+Configure-SqlFirewall $resourceGroup $serverName "MyVM" $vmIp
+
+# === Migrate Data into SQL Database ===
 Migrate-Data-To-DB `
     -resourceGroup $resourceGroup `
     -serverName $serverName `
@@ -42,9 +69,11 @@ Migrate-Data-To-DB `
     -adminUser $sqlAdminUser `
     -adminPassword $sqlAdminPassword
 
+# === Output SQL Connection Info ===
 $serverFqdn = "$serverName.database.windows.net"
-Write-Host "`n Your SQL Server is accessible at: $serverFqdn"
-Write-Host " Connect using SQL Server Management Studio (SSMS), Azure Data Studio, or JDBC/ODBC:"
-Write-Host "   Server: $serverFqdn"
-Write-Host "   Database: $databaseName"
-Write-Host "   Username: $sqlAdminUser"
+Write-Host "`nYour SQL Server is accessible at: $serverFqdn"
+Write-Host "Connect using SQL Server Management Studio (SSMS), Azure Data Studio, or JDBC/ODBC:"
+Write-Host "  Server: $serverFqdn"
+Write-Host "  Database: $databaseName"
+Write-Host "  Username: $sqlAdminUser"
+

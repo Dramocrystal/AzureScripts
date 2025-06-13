@@ -120,11 +120,10 @@ function Migrate-Data-To-DB(
     $adminUser,
     $adminPassword
 ) {
-
     $keys = Get-AzStorageAccountKey -ResourceGroupName $resourceGroup -Name $storageAccountName
     $storageKey = $keys[0].Value
-    Write-Host "Importing $blobName into database $databaseName..."
 
+    Write-Host "Starting import of $blobName into database $databaseName..."
 
     $import = New-AzSqlDatabaseImport -ResourceGroupName $resourceGroup `
                                       -ServerName $serverName `
@@ -137,30 +136,116 @@ function Migrate-Data-To-DB(
                                       -Edition "Premium" `
                                       -ServiceObjectiveName "P1" `
                                       -DatabaseMaxSizeBytes 5368709120
-    Write-Host "Import started. Status: $($import.Status)"
+
+    Write-Host "Import started. Monitoring progress..."
+    $startTime = Get-Date
+    $progressId = 1
+    $counter = 0
+
+    do {
+        Start-Sleep -Seconds 5
+        $counter += 1
+
+        $status = Get-AzSqlDatabaseImportExportStatus `
+            -OperationStatusLink $import.OperationStatusLink
+
+        $state = $status.Status
+
+        $elapsed = (Get-Date) - $startTime
+        $message = "Status: $state - Elapsed: $([math]::Round($elapsed.TotalSeconds))s"
+
+        Write-Progress -Id $progressId `
+                       -Activity "Importing $databaseName" `
+                       -Status $message `
+                       -PercentComplete (($counter % 20) * 5)  # fake % to animate
+
+    } while ($state -eq "InProgress")
+
+    Write-Progress -Id $progressId -Completed -Activity "Importing $databaseName"
+
+    if ($state -eq "Succeeded") {
+        Write-Host "`n Import completed successfully in $([math]::Round($elapsed.TotalSeconds)) seconds."
+    } else {
+        throw "Import failed: $($status.ErrorMessage)"
+    }
+
     return $import
 }
 
-function Configure-SqlFirewall ($resourceGroup, $serverName) {
-    # Allow Azure services
-    New-AzSqlServerFirewallRule `
-        -ResourceGroupName $resourceGroup `
-        -ServerName $serverName `
-        -FirewallRuleName "AllowAzureServices" `
-        -StartIpAddress "0.0.0.0" `
-        -EndIpAddress "0.0.0.0" | Out-Null
 
-    # Get your current public IP
-    $myIp = (Invoke-RestMethod -Uri "https://api.ipify.org").ToString()
-
-    # Allow your IP
-    New-AzSqlServerFirewallRule `
-        -ResourceGroupName $resourceGroup `
-        -ServerName $serverName `
-        -FirewallRuleName "MyPublicIP" `
-        -StartIpAddress $myIp `
-        -EndIpAddress $myIp | Out-Null
-
-    Write-Host "SQL firewall rules configured (Azure + $myIp)"
+function Get-PublicIp {
+    return (Invoke-RestMethod -Uri "https://api.ipify.org").ToString()
 }
+
+
+function Configure-SqlFirewall ($resourceGroup, $serverName, $ruleName, $ipAddress) {
+    $existingRules = Get-AzSqlServerFirewallRule -ResourceGroupName $resourceGroup -ServerName $serverName
+
+    $ruleExists = $existingRules | Where-Object {
+        $_.FirewallRuleName -eq $ruleName -and $_.StartIpAddress -eq $ipAddress -and $_.EndIpAddress -eq $ipAddress
+    }
+
+    if (-not $ruleExists) {
+        Write-Host "Creating firewall rule: $ruleName for IP $ipAddress"
+        New-AzSqlServerFirewallRule `
+            -ResourceGroupName $resourceGroup `
+            -ServerName $serverName `
+            -FirewallRuleName $ruleName `
+            -StartIpAddress $ipAddress `
+            -EndIpAddress $ipAddress | Out-Null
+    } else {
+        Write-Host "Firewall rule '$ruleName' for IP $ipAddress already exists."
+    }
+}
+
+
+
+function Deploy-VM (
+    $resourceGroup,
+    $location,
+    $vmName,
+    $adminUsername,
+    $adminPassword,
+    $vmSize,
+    $image
+) {
+    $existingVM = Get-AzVM -Name $vmName -ResourceGroupName $resourceGroup -ErrorAction SilentlyContinue
+
+    if (-not $existingVM) {
+        $cred = New-Object PSCredential ($adminUsername, $adminPassword)
+        New-AzVM -ResourceGroupName $resourceGroup `
+                 -Name $vmName `
+                 -Location $location `
+                 -VirtualNetworkName "$vmName-vnet" `
+                 -SubnetName "$vmName-subnet" `
+                 -PublicIpAddressName "$vmName-ip" `
+                 -Image $image `
+                 -Credential $cred `
+                 -Size $vmSize `
+                 -OpenPorts 80,3389 | Out-Null
+    } else {
+        Start-AzVM -Name $vmName -ResourceGroupName $resourceGroup | Out-Null
+    }
+
+    # Install IIS
+    $installIIS = @"
+    Install-WindowsFeature -Name Web-Server -IncludeManagementTools
+"@
+
+    Invoke-AzVMRunCommand -ResourceGroupName $resourceGroup -VMName $vmName -CommandId 'RunPowerShellScript' -ScriptString $installIIS | Out-Null
+
+    # Ensure only the IP is returned
+    $publicIp = (Get-AzPublicIpAddress -ResourceGroupName $resourceGroup | Where-Object { $_.Name -eq "$vmName-ip" }).IpAddress
+
+    if (-not $publicIp) {
+        throw "VM public IP not found or not assigned"
+    }
+
+    $publicIpStr = $publicIp.ToString()
+    Write-Host "VM Public IP: $publicIpStr"
+
+    return $publicIpStr
+
+}
+
 
